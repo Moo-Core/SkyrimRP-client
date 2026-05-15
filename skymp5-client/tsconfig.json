@@ -1,7 +1,7 @@
 {
   "verbose": true,
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2020",
     "module": "es2015",
     "strict": true,
     "alwaysStrict": true,
@@ -11,7 +11,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
-    "lib": ["esnext"],
+    "lib": ["esnext", "dom"],
     "paths": { "skyrimPlatform": ["node_modules/@skyrim-platform/skyrim-platform"] },
     "outDir": "dist"
   },

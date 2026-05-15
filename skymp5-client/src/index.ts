@@ -56,6 +56,7 @@ import { SweetCameraEnforcementService } from "./services/services/sweetCameraEn
 import { SweetTaffyNicknamesService } from "./services/services/sweetTaffyNicknamesService";
 import { ServerJsVerificationService } from "./services/services/serverJsVerificationService";
 import { SweetTaffyEvalService } from "./services/services/sweetTaffyEvalService";
+import { SkyrimRpBootstrapService } from "./services/services/skyrimRpBootstrap";
 
 once("update", () => {
   Utility.setINIBool("bAlwaysActive:General", true);
@@ -116,7 +117,12 @@ const main = () => {
       new MagicSyncService(sp, controller),
       new ProfilingService(sp, controller),
       new SweetTaffyNicknamesService(sp, controller),
-      new ServerJsVerificationService(sp, controller)
+      new ServerJsVerificationService(sp, controller),
+      // SkyrimRP transport: speaks length-prefixed protobuf to our own gateway
+      // (currently a WebSocket on :7778, eventually QUIC on :7777). Runs in
+      // parallel with skymp's NetworkingService for now; once the SkyrimRP
+      // gameplay layer is solid the original networking can be removed.
+      new SkyrimRpBootstrapService(sp, controller),
     ];
     SpApiInteractor.setup(listeners);
   } catch (e) {

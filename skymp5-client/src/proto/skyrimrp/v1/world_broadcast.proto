@@ -1,0 +1,99 @@
+syntax = "proto3";
+package skyrimrp.v1;
+
+import "skyrimrp/v1/client_intent.proto";
+
+// Issued by World to Gateway: "please deliver this payload to N clients."
+// The payload is an already-serialized world-state message (e.g., PlayerState,
+// SpawnPlayer) which the Gateway treats as opaque bytes — Gateway does NOT
+// re-parse or modify it. This keeps the Gateway cheap.
+
+message BroadcastInstruction {
+  oneof targeting {
+    Radius      radius   = 1;     // all sessions within `r` of `center`
+    PlayerList  list     = 2;     // explicit set of session_ids
+    Everyone    everyone = 3;     // all live sessions
+  }
+
+  bytes              payload     = 10;  // opaque serialized world-state message
+  ReliabilityClass   reliability = 11;
+  uint32             channel     = 12;  // QUIC stream channel, 0..N-1
+  uint32             ttl_ms      = 13;  // gateway may drop after this; 0 = no deadline
+}
+
+message Radius {
+  Vec3   center        = 1;
+  float  r             = 2;
+  string cell_formid   = 3;        // optional gating: only same-cell
+  repeated uint64 exclude_sessions = 4; // skip these (e.g., the originator)
+}
+
+message PlayerList {
+  repeated uint64 session_ids = 1;
+}
+
+message Everyone {}
+
+enum ReliabilityClass {
+  UNRELIABLE       = 0;             // position updates; drop is fine
+  RELIABLE         = 1;             // must arrive eventually
+  RELIABLE_ORDERED = 2;             // must arrive in order (chat, inventory state)
+}
+
+// Concrete world-state messages that flow as `payload` bytes. Defined here so
+// both sides agree on the byte format.
+
+message PlayerStateUpdate {
+  uint64 session_id      = 1;
+  uint64 character_id    = 2;
+  Vec3   position        = 3;
+  float  rotation_z      = 4;
+  Vec3   velocity        = 5;
+  string anim_event      = 6;
+  bool   is_sprinting    = 7;
+  bool   is_sneaking     = 8;
+  bool   in_combat       = 9;
+  uint64 world_ts_ns     = 10;     // authoritative timestamp from World
+}
+
+message SpawnPlayer {
+  uint64 session_id    = 1;
+  uint64 character_id  = 2;
+  string display_name  = 3;
+  Vec3   position      = 4;
+  float  rotation_z    = 5;
+  string cell_formid   = 6;
+  bytes  appearance    = 7;        // racemenu blob, opaque
+}
+
+message DespawnPlayer {
+  uint64 session_id   = 1;
+  uint64 character_id = 2;
+  string reason       = 3;
+}
+
+message ChatBroadcast {
+  uint64 from_character = 1;
+  string from_name      = 2;
+  string text           = 3;       // already filtered/sanitized
+  uint32 channel        = 4;       // mirrors ChatIntent.Channel
+  uint64 world_ts_ns    = 5;
+}
+
+// Server-authoritative stat broadcast. Emitted by the server on significant
+// changes (>5% delta or threshold cross) and at most every 500ms per character.
+// Clients use this to render OTHER players' health bars and to reconcile
+// their OWN HUD against the server's truth (which always wins).
+message ServerStatsUpdate {
+  uint64 session_id   = 1;
+  uint64 character_id = 2;
+  float  health       = 3;  // current
+  float  health_max   = 4;
+  float  stamina      = 5;
+  float  stamina_max  = 6;
+  float  magicka      = 7;
+  float  magicka_max  = 8;
+  bool   in_combat    = 9;
+  bool   is_dead      = 10;
+  uint64 world_ts_ns  = 11;
+}

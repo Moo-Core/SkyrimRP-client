@@ -1,0 +1,131 @@
+syntax = "proto3";
+package skyrimrp.v1;
+
+// ClientIntent: every gameplay action the client wants to perform. The Gateway
+// performs cheap structural validation (size, rate, plausibility); the World
+// performs authoritative business validation against persistent state.
+//
+// IMPORTANT: nothing in here is a "fact" — these are all REQUESTS. The World
+// decides what actually happens to the world.
+
+message ClientIntent {
+  uint64 session_id = 1;       // assigned by Gateway; clients never set this
+  uint64 client_seq = 2;       // monotonic per-session, for dedup + ordering
+  uint64 client_ts_ns = 3;     // client-claimed timestamp, untrusted but useful for diagnostics
+
+  oneof body {
+    MovementIntent       movement       = 10;
+    AnimationIntent      animation      = 11;
+    InventoryActionIntent inventory     = 12;
+    EquipIntent          equip          = 13;
+    ChatIntent           chat           = 14;
+    InteractIntent       interact       = 15;
+    CombatHitIntent      combat         = 16;
+    // future: dialogue, crafting, ...
+  }
+}
+
+// --- combat ------------------------------------------------------------------
+// Client claim: "I hit the target with this weapon for this kind of strike."
+// The server is the source of truth — validates range, line-of-sight (later),
+// weapon ownership, then computes and applies damage. The client never sets
+// stats; this is a *request* to resolve a hit.
+message CombatHitIntent {
+  uint64 target_character     = 1;   // character_id of who was struck
+  uint64 weapon_item_uid      = 2;   // 0 = unarmed/fist
+  enum HitKind {
+    UNSPECIFIED   = 0;
+    REGULAR       = 1;       // standard melee swing
+    POWER         = 2;       // power attack (~2x damage, costs stamina)
+    BLOCK_BASH    = 3;       // shield bash
+  }
+  HitKind hit_kind            = 3;
+  float  claimed_distance     = 4;   // attacker's claimed distance to target, in game units
+  uint64 claimed_hit_ts_ns    = 5;   // attacker's local hit timestamp (untrusted)
+}
+
+// --- movement -----------------------------------------------------------------
+message MovementIntent {
+  Vec3   position = 1;          // worldspace coordinate
+  float  rotation_z = 2;        // facing, radians
+  Vec3   velocity = 3;          // self-reported; gateway clamps
+  string cell_formid = 4;       // worldspace/cell formid (e.g. "0x3C")
+  bool   is_sprinting = 5;
+  bool   is_sneaking = 6;
+  bool   in_combat = 7;         // self-reported intent only
+}
+
+// --- animation ----------------------------------------------------------------
+message AnimationIntent {
+  string anim_event = 1;        // canonical animation event name; whitelist enforced server-side
+  uint32 variant    = 2;
+}
+
+// --- inventory ----------------------------------------------------------------
+message InventoryActionIntent {
+  enum Action {
+    UNSPECIFIED = 0;
+    DROP        = 1;
+    PICKUP      = 2;
+    USE         = 3;            // consumable
+    SPLIT_STACK = 4;
+    MOVE_SLOT   = 5;
+  }
+  Action action      = 1;
+  uint64 item_uid    = 2;       // per-instance UID; never trust formid alone
+  uint32 quantity    = 3;
+  uint64 target_uid  = 4;       // for pickup: world-item UID; for move: container UID
+}
+
+// --- equip --------------------------------------------------------------------
+message EquipIntent {
+  uint64 item_uid = 1;
+  enum Slot {
+    UNSPECIFIED = 0;
+    LEFT_HAND   = 1;
+    RIGHT_HAND  = 2;
+    BOTH_HANDS  = 3;
+    ARMOR_HEAD  = 10;
+    ARMOR_BODY  = 11;
+    ARMOR_HANDS = 12;
+    ARMOR_FEET  = 13;
+    SHIELD      = 14;
+  }
+  Slot slot   = 2;
+  bool unequip = 3;
+}
+
+// --- chat ---------------------------------------------------------------------
+message ChatIntent {
+  enum Channel {
+    UNSPECIFIED = 0;
+    LOCAL       = 1;            // proximity
+    WHISPER     = 2;            // target_character required
+    OOC         = 3;            // out of character, server-wide
+    SYSTEM_CMD  = 4;            // starts with '/', server parses
+  }
+  Channel channel          = 1;
+  string  text             = 2; // UTF-8, max 512 bytes after normalization
+  uint64  target_character = 3; // for whisper
+}
+
+// --- interact -----------------------------------------------------------------
+message InteractIntent {
+  uint64 target_ref = 1;         // ref-formid the client claims to be interacting with
+  enum Kind {
+    UNSPECIFIED = 0;
+    ACTIVATE    = 1;
+    OPEN        = 2;
+    LOOT        = 3;
+    SIT         = 4;
+    DOOR        = 5;
+  }
+  Kind kind = 2;
+}
+
+// --- shared types -------------------------------------------------------------
+message Vec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}

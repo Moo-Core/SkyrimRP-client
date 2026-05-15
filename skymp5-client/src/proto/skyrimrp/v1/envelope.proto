@@ -1,0 +1,54 @@
+syntax = "proto3";
+package skyrimrp.v1;
+
+// The top-level envelope for every message crossing the Gateway <-> World boundary.
+// Versioning: every change is additive (new field numbers, new oneof arms) until a
+// MAJOR_VERSION bump. The proto version is reflected in this package name (.v1).
+//
+// Direction:
+//   Gateway -> World: GatewayMessage
+//   World   -> Gateway: WorldMessage
+
+import "skyrimrp/v1/client_intent.proto";
+import "skyrimrp/v1/world_broadcast.proto";
+import "skyrimrp/v1/control.proto";
+import "skyrimrp/v1/session.proto";
+
+message GatewayMessage {
+  oneof body {
+    SessionOpened session_opened = 1;       // gateway accepted a session; here are its attrs
+    SessionClosed session_closed = 2;       // session terminated (reason inside)
+    ClientIntent  intent         = 3;       // a validated intent from a client
+    HeartbeatPing heartbeat      = 4;       // liveness check; world echoes back
+  }
+  uint64 gateway_seq    = 50;               // monotonic per-process counter, for tracing
+  uint64 emitted_at_ns  = 51;               // gateway-side timestamp, nanos since epoch
+}
+
+message WorldMessage {
+  oneof body {
+    BroadcastInstruction broadcast = 1;     // send a payload to N clients
+    ControlCommand       control   = 2;     // kick/throttle/announce
+    HeartbeatPong        heartbeat = 3;     // response to gateway ping
+    ProtocolError        error     = 4;     // world rejects this message (with reason)
+  }
+  uint64 world_seq    = 50;
+  uint64 emitted_at_ns = 51;
+}
+
+message HeartbeatPing  { uint64 nonce = 1; }
+message HeartbeatPong  { uint64 nonce = 1; }
+
+message ProtocolError {
+  enum Code {
+    UNSPECIFIED        = 0;
+    UNKNOWN_SESSION    = 1;
+    INVALID_INTENT     = 2;
+    RATE_LIMIT_EXCEEDED= 3;
+    VERSION_MISMATCH   = 4;
+    BUSINESS_REJECTED  = 5;     // world said no for gameplay reasons
+  }
+  Code   code   = 1;
+  string detail = 2;            // human-readable, never trust for parsing
+  uint64 ref_gateway_seq = 3;   // which inbound message this rejects (0 = unsolicited)
+}
