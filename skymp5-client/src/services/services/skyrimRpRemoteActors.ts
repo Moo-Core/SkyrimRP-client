@@ -121,8 +121,28 @@ export class SkyrimRpRemoteActorsService extends ClientListener {
     z: number,
     rotZRad: number,
   ): void {
-    if (sessionId === this.localSessionId) {
-      // The server may "spawn" us as a confirmation; nothing to render.
+    // Self-spawn: per the server team's brief (af91295), when a session
+    // opens the gateway sends two SpawnPlayer broadcasts — one for nearby
+    // players, one for the local client. The local one is the
+    // authoritative position; we teleport the local player there rather
+    // than rendering a duplicate body.
+    if (sessionId === this.localSessionId && sessionId !== BigInt(0)) {
+      try {
+        const player = Game.getPlayer();
+        if (player) {
+          player.setPosition(x, y, z);
+          player.setAngle(0, 0, (rotZRad * 180) / Math.PI);
+          logTrace(
+            "SkyrimRpRemoteActors",
+            `self-spawn s=${sessionId} → teleport local player to (${x.toFixed(0)}, ${y.toFixed(0)}, ${z.toFixed(0)})`,
+          );
+        }
+      } catch (e) {
+        logError(
+          "SkyrimRpRemoteActors",
+          `self-spawn teleport failed: ${(e as Error).message}`,
+        );
+      }
       return;
     }
     const key = sessionId.toString();

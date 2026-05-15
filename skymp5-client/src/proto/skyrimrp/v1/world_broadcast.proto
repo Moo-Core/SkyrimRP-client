@@ -97,3 +97,21 @@ message ServerStatsUpdate {
   bool   is_dead      = 10;
   uint64 world_ts_ns  = 11;
 }
+
+// Typed envelope that wraps ALL world-state broadcasts. The world server
+// serializes one of these to bytes and puts it in BroadcastInstruction.payload.
+// The gateway treats those bytes as opaque (doesn't decode). The client
+// decodes a WorldStateBroadcast and dispatches on body.$case — no try-decode
+// fragility, no separate discriminator field, fully type-safe in any language.
+//
+// Adding a new broadcast type = new oneof arm with a fresh field number.
+// Old clients ignore unknown arms (oneof default) — backward compatible.
+message WorldStateBroadcast {
+  oneof body {
+    PlayerStateUpdate player_state = 1;
+    SpawnPlayer       spawn        = 2;
+    DespawnPlayer     despawn      = 3;
+    ChatBroadcast     chat         = 4;
+    ServerStatsUpdate stats        = 5;
+  }
+}
