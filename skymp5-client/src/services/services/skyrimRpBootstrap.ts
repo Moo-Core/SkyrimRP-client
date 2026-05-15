@@ -14,6 +14,7 @@
 import { logError, logTrace } from "../../logging";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { SkyrimRpTransport } from "./skyrimRpTransport";
+import { SkyrimRpRemoteActorsService } from "./skyrimRpRemoteActors";
 
 /** Wire-protocol version this client speaks. Must equal the server's
  *  `expected_protocol_version`. Bump together with a `.vN` package rename. */
@@ -41,6 +42,11 @@ export class SkyrimRpBootstrapService extends ClientListener {
     // services to be wired up first so anything subscribing to
     // skymp's `connectionAccepted` / `disconnect` events still works.
     this.controller.once("update", () => this.start());
+  }
+
+  /** Other Phase B/C services reach the transport through here. */
+  getTransport(): SkyrimRpTransport {
+    return this.transport;
   }
 
   private start(): void {
@@ -74,8 +80,14 @@ export class SkyrimRpBootstrapService extends ClientListener {
       })
       .then((ack) => {
         logTrace(this, `gateway accepted, session_id=${ack.sessionId}`);
-        // Phase B/C will subscribe `transport.onFrame(...)` here to decode
-        // SpawnPlayer / PlayerStateUpdate / ChatBroadcast / ServerStatsUpdate.
+        // Tell the remote-actors service which session_id is "us" so it
+        // doesn't render a second body at our position. The bootstrap ↔
+        // remoteActors imports form a cycle, but ESM resolves it cleanly:
+        // neither module accesses the other at module top-level, only
+        // inside class methods. By the time `.then` fires, both classes
+        // are fully initialized.
+        const remotes = this.controller.lookupListener(SkyrimRpRemoteActorsService);
+        if (remotes) remotes.setLocalSessionId(ack.sessionId);
       })
       .catch((e) => {
         logError(this, `gateway dial failed: ${(e as Error).message}`);
