@@ -1,0 +1,36 @@
+syntax = "proto3";
+package skyrimrp.v1;
+
+// Control plane: World -> Gateway. Out-of-band instructions that don't broadcast
+// to clients (or do, but with side effects in the gateway).
+
+message ControlCommand {
+  oneof command {
+    Kick                kick     = 1;
+    Throttle            throttle = 2;
+    AnnounceWorldState  announce = 3;
+    ReloadConfig        reload   = 4;
+  }
+}
+
+message Kick {
+  uint64 session_id = 1;
+  string reason     = 2;          // for audit; client sees a generic disconnect code
+}
+
+message Throttle {
+  uint64 session_id   = 1;
+  string message_type = 2;        // e.g. "MovementIntent"; empty = all
+  uint32 max_per_sec  = 3;        // 0 = block entirely
+  uint32 duration_ms  = 4;        // 0 = until session closes
+}
+
+// A side-channel broadcast (e.g. server-wide motd). Gateway will serialize
+// this and deliver to all sessions according to ReliabilityClass.
+message AnnounceWorldState {
+  string message = 1;
+}
+
+message ReloadConfig {
+  string scope = 1;               // e.g. "rate_limits", "aoi"; gateway-specific keys
+}

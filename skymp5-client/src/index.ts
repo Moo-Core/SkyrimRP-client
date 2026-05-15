@@ -56,6 +56,9 @@ import { SweetCameraEnforcementService } from "./services/services/sweetCameraEn
 import { SweetTaffyNicknamesService } from "./services/services/sweetTaffyNicknamesService";
 import { ServerJsVerificationService } from "./services/services/serverJsVerificationService";
 import { SweetTaffyEvalService } from "./services/services/sweetTaffyEvalService";
+import { SkyrimRpBootstrapService } from "./services/services/skyrimRpBootstrap";
+import { SkyrimRpClientIntentsService } from "./services/services/skyrimRpClientIntents";
+import { SkyrimRpRemoteActorsService } from "./services/services/skyrimRpRemoteActors";
 
 once("update", () => {
   Utility.setINIBool("bAlwaysActive:General", true);
@@ -116,7 +119,14 @@ const main = () => {
       new MagicSyncService(sp, controller),
       new ProfilingService(sp, controller),
       new SweetTaffyNicknamesService(sp, controller),
-      new ServerJsVerificationService(sp, controller)
+      new ServerJsVerificationService(sp, controller),
+      // SkyrimRP stack: protobuf-over-WebSocket to our own gateway, in parallel
+      // with skymp's NetworkingService. Order in this group matters — the
+      // bootstrap owns the transport, intents send through it, and remote
+      // actors subscribe to inbound broadcasts.
+      new SkyrimRpBootstrapService(sp, controller),
+      new SkyrimRpClientIntentsService(sp, controller),
+      new SkyrimRpRemoteActorsService(sp, controller),
     ];
     SpApiInteractor.setup(listeners);
   } catch (e) {

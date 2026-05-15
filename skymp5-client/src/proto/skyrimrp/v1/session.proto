@@ -1,0 +1,30 @@
+syntax = "proto3";
+package skyrimrp.v1;
+
+// Session lifecycle messages — emitted by the Gateway to inform the World about
+// connection state. Gateway is the source of truth for session_id; World is the
+// source of truth for account_id and character_id.
+
+message SessionOpened {
+  uint64 session_id   = 1;     // gateway-assigned, unique within gateway lifetime
+  uint64 account_id   = 2;     // resolved via Account API /session/verify
+  string client_ip    = 3;     // already normalized to canonical string (v4 or v6)
+  uint32 protocol_ver = 4;     // major version of skyrimrp.vN the client speaks
+  uint64 opened_at_ns = 5;
+}
+
+message SessionClosed {
+  enum Reason {
+    UNSPECIFIED      = 0;
+    CLIENT_QUIT      = 1;
+    TIMEOUT          = 2;
+    KICKED           = 3;       // gateway received a Kick control command
+    PROTOCOL_VIOLATION = 4;     // bad packets, signature failures
+    RATE_LIMITED_OUT = 5;       // sustained limit hits
+    GATEWAY_SHUTDOWN = 6;
+  }
+  uint64 session_id   = 1;
+  Reason reason       = 2;
+  string detail       = 3;
+  uint64 closed_at_ns = 4;
+}

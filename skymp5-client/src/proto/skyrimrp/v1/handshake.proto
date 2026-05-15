@@ -1,0 +1,20 @@
+syntax = "proto3";
+package skyrimrp.v1;
+
+// Client-side handshake on the first bidirectional QUIC stream. The client
+// sends ClientHello; the gateway replies ClientHelloAck on the same stream.
+// All subsequent intent frames flow on the same stream after `ok=true`.
+
+message ClientHello {
+  uint32 protocol_version    = 1;     // major version of skyrimrp.vN the client speaks
+  string session_token       = 2;     // bearer issued by Accounts API /login
+  uint64 claimed_character_id = 3;    // which character the client intends to spawn as
+  string client_build        = 4;     // free-form build id ("launcher 0.3.1+a1b2c3d")
+}
+
+message ClientHelloAck {
+  bool   ok                       = 1;
+  uint64 session_id               = 2;   // gateway-assigned; 0 on failure
+  string reason                   = 3;   // human-readable on failure
+  uint32 server_protocol_version  = 4;
+}
